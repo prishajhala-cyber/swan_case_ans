@@ -1,6 +1,6 @@
 ## Summary
 
-I reviewed all 50,000 claims and $26.4M in payments processed in 2025. The analysis identified **~$45,290.24 in leakage** across four distinct issues, representing roughly 0.17% of total spend. Three of the four findings are high-confidence and mechanically verifiable. One finding is medium-confidence and should be researched further before any recovery action.
+I reviewed all 50,000 claims and $26.4M in payments processed in 2025. The analysis identified **$45,290.24 in leakage** across four distinct issues, representing roughly 0.17% of total spend. Three of the four findings are high-confidence and mechanically verifiable. One finding is medium-confidence and should be researched further before any recovery action.
 
 The good news is controls that should be working largely are. Uncontracted providers ($0 paid on 1,208 claims) and providers with leading-zero TIN encoding mismatches (313 claims) were both correctly blocked. The leakage found stems from a small number of specific system gaps, not a widespread control failure.
 
