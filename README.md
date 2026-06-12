@@ -14,8 +14,7 @@ Python 3.9+ required.
 python analysis.py
 ```
 
-By default, the script reads data from `/mnt/user-data/uploads/`. To change
-the data path, update the `DATA_DIR` constant at the top of `analysis.py`.
+By default, the script reads data from `/Users/prishajhala/Downloads/swan-case/data`. To change the data path, update the `DATA_DIR` constant at the top of `analysis.py`.
 
 Expected input files in `DATA_DIR`:
 - `claims.csv`
