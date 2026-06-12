@@ -85,6 +85,7 @@ The good news is controls that should be working largely are. Uncontracted provi
 | **Total** | **131** | **$45,290** | |
 
 High-confidence leakage (F1–F4): **$41,162**
+
 Medium-confidence leakage (F5): **$4,128**
 
 
