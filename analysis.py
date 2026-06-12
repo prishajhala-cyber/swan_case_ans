@@ -1,18 +1,20 @@
 """
 Swan Case: Healthcare Claims Leakage Analysis
-Author: Data Analysis
+Author: Prisha Jhala
 Usage: python analysis.py
 Requires: pandas, numpy
-Input files expected in same directory (or adjust DATA_DIR)
+Input files expected in same directory, adjust DATA_DIR accordingly
 """
 
 import pandas as pd
 import numpy as np
 import os
 
-DATA_DIR = "/mnt/user-data/uploads"
+DATA_DIR = "/Users/prishajhala/Downloads/swan-case/data"
 
 def load_data():
+    """Load data."""
+    
     claims = pd.read_csv(f"{DATA_DIR}/claims.csv")
     payments = pd.read_csv(f"{DATA_DIR}/payments.csv")
     providers = pd.read_csv(f"{DATA_DIR}/providers.csv")
@@ -25,6 +27,7 @@ def load_data():
 
 def fix_dtypes(claims, payments, providers, fee_schedule, amendments, carveouts, elig_history, members):
     """Fix data types and normalize formats across all tables."""
+    
     # Date parsing - claims.dos has mixed MM/DD/YYYY and YYYY-MM-DD formats (data quality issue)
     claims['dos'] = pd.to_datetime(claims['dos'], format='mixed')
     
@@ -35,7 +38,6 @@ def fix_dtypes(claims, payments, providers, fee_schedule, amendments, carveouts,
     claims['provider_tin_norm'] = claims['provider_tin'].str.replace('-', '', regex=False)
     # Strip leading zeros to match providers table (which stores as int)
     claims['provider_tin_stripped'] = claims['provider_tin_norm'].str.lstrip('0')
-    
     claims['cpt'] = claims['cpt'].astype(str)
     
     providers['tin'] = providers['tin'].astype(str)
@@ -65,6 +67,7 @@ def fix_dtypes(claims, payments, providers, fee_schedule, amendments, carveouts,
 
 def apply_amendments(providers, amendments):
     """Apply contract amendments to effective provider table."""
+    
     providers_eff = providers.copy()
     for _, amend in amendments.iterrows():
         mask = providers_eff['tin'] == amend['provider_tin']
@@ -76,11 +79,12 @@ def apply_amendments(providers, amendments):
 def calc_correct_allowed(row, carveout_tin='238494007', carveout_cpt='72148', carveout_rate=720.0):
     """
     Calculate the correct allowed amount per claim.
-    Rules (from pricing_notes.md):
+    Rules from pricing_notes.md:
     - Carveout: provider 238494007, CPT 72148 -> $720 flat rate
     - Modifier 22 -> 1.20x of fee schedule
     - All other modifiers (25, 59, RT, LT) -> no payment effect
     """
+    
     # Carveout takes precedence
     if row['provider_tin_norm'] == carveout_tin and row['cpt'] == carveout_cpt:
         return carveout_rate
@@ -91,6 +95,7 @@ def calc_correct_allowed(row, carveout_tin='238494007', carveout_cpt='72148', ca
 
 def finding_duplicate_payments(payments):
     """FINDING 1: Duplicate payments - same claim_id paid more than once."""
+    
     dup_mask = payments.duplicated('claim_id', keep=False)
     dup_payments = payments[dup_mask]
     # Amount recoverable = sum of second (and beyond) payments
@@ -114,18 +119,15 @@ def finding_duplicate_payments(payments):
 
 def finding_post_termination(claims, payments, providers_eff):
     """FINDING 2: Claims paid after provider contract end date."""
+    
     payments_dedup = payments.drop_duplicates('claim_id', keep='first')
     
     # Match using normalized TINs (handles leading-zero and dash variants)
-    claims_prov = claims.merge(
-        providers_eff[['tin','contracted','contract_start_date','contract_end_date']], 
-        left_on='provider_tin_norm', right_on='tin', how='left'
-    )
+    claims_prov = claims.merge(providers_eff[['tin','contracted','contract_start_date','contract_end_date']], 
+        left_on='provider_tin_norm', right_on='tin', how='left')
     
-    contracted_with_end = claims_prov[
-        (claims_prov['contracted'] == 'Y') & 
-        (claims_prov['contract_end_date'].notna())
-    ].copy()
+    contracted_with_end = claims_prov[(claims_prov['contracted'] == 'Y') & 
+        (claims_prov['contract_end_date'].notna())].copy()
     
     after_end = contracted_with_end[contracted_with_end['dos'] > contracted_with_end['contract_end_date']].copy()
     after_end_paid = after_end.merge(payments_dedup, on='claim_id')
@@ -137,9 +139,7 @@ def finding_post_termination(claims, payments, providers_eff):
     print(f"  Providers affected: {after_end_paid['provider_tin_norm'].nunique()}")
     print(f"  Total paid: ${after_end_paid['paid_amt'].sum():,.2f}")
     
-    by_prov = after_end_paid.merge(
-        providers_eff[['tin','name']], left_on='provider_tin_norm', right_on='tin', how='left'
-    ).groupby(['provider_tin_norm','name'])['paid_amt'].agg(['count','sum']).sort_values('sum', ascending=False)
+    by_prov = after_end_paid.merge(providers_eff[['tin','name']], left_on='provider_tin_norm', right_on='tin', how='left').groupby(['provider_tin_norm','name'])['paid_amt'].agg(['count','sum']).sort_values('sum', ascending=False)
     print(f"\n  By provider:")
     print(by_prov.to_string())
     
@@ -151,6 +151,7 @@ def finding_post_termination(claims, payments, providers_eff):
 
 def finding_billed_charges_dash_tin(claims, payments, fee_schedule):
     """FINDING 3: Two providers with dash-formatted TINs paid at billed charges instead of fee schedule."""
+    
     payments_dedup = payments.drop_duplicates('claim_id', keep='first')
     
     dash_claims = claims[claims['provider_tin'].str.contains('-', na=False)].copy()
@@ -181,6 +182,7 @@ def finding_billed_charges_dash_tin(claims, payments, fee_schedule):
 
 def finding_ineligible_members(claims, payments, members, elig_history):
     """FINDING 4: Claims paid for members past their eligibility end date."""
+    
     payments_dedup = payments.drop_duplicates('claim_id', keep='first')
     
     # Members with retroactive reinstatement should NOT be flagged
@@ -211,6 +213,7 @@ def finding_ineligible_members(claims, payments, members, elig_history):
 
 def finding_misc_fee_schedule(claims, payments, fee_schedule):
     """FINDING 5: Miscellaneous fee schedule overpayments (non-dash, non-carveout providers)."""
+    
     payments_dedup = payments.drop_duplicates('claim_id', keep='first')
     
     non_dash = claims[~claims['provider_tin'].str.contains('-', na=False)].copy()
@@ -236,10 +239,10 @@ def finding_misc_fee_schedule(claims, payments, fee_schedule):
     return overpaid['overpaid'].sum(), overpaid['claim_id'].tolist()
 
 def main():
-    print("Loading data...")
+    print("Loading data")
     claims, payments, providers, fee_schedule, amendments, carveouts, elig_history, members = load_data()
     
-    print("Fixing data types...")
+    print("Fixing data types")
     claims, payments, providers, fee_schedule, amendments, carveouts, elig_history, members = \
         fix_dtypes(claims, payments, providers, fee_schedule, amendments, carveouts, elig_history, members)
     
@@ -273,6 +276,7 @@ def main():
     print(f"\n  As % of total paid: {total/total_paid*100:.2f}%")
     print(f"\n  NOTE: F5 (misc fee schedule) is medium-confidence.")
     print(f"        High-confidence leakage: ${f1_amt+f2_amt+f3_amt+f4_amt:,.2f}")
+    print(f"        Medium-confidence leakage: ${f5_amt:,.2f}")
 
 if __name__ == "__main__":
     main()
